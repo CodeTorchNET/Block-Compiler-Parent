@@ -1,0 +1,9 @@
+# Dockerfile for Python
+# Version: 1.0
+FROM python:3.9
+
+RUN pip install --upgrade pip
+
+# start main.py
+CMD ["python", "app/entry.py"]
+

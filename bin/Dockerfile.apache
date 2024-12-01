@@ -1,0 +1,19 @@
+# Dockerfile.apache
+FROM httpd:2.4
+
+# Suppress debconf complaints
+ARG DEBIAN_FRONTEND=noninteractive
+# Enable Apache modules
+RUN a2enmod proxy_fcgi rewrite headers
+
+# Enable proxy_http
+RUN a2enmod proxy_http
+
+# Enable ssl
+RUN a2enmod ssl
+
+# Expose HTTP and HTTPS ports
+EXPOSE 80 443
+
+# Start Apache in the foreground
+CMD ["httpd-foreground"]
