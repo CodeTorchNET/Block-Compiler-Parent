@@ -1,19 +1,24 @@
-# Dockerfile.apache
-FROM httpd:2.4
+FROM php:8.3-apache
 
 # Suppress debconf complaints
 ARG DEBIAN_FRONTEND=noninteractive
-# Enable Apache modules
-RUN a2enmod proxy_fcgi rewrite headers
 
-# Enable proxy_http
+# Remove PHP-related packages, leaving Apache and required modules
+RUN apt-get update && \
+    apt-get remove --purge -y php* && \
+    apt-get autoremove -y && \
+    apt-get clean
+
+# Enable Apache modules (mod_proxy, mod_proxy_fcgi, mod_proxy_http, etc.)
+RUN a2enmod proxy proxy_fcgi rewrite headers ssl
+
 RUN a2enmod proxy_http
 
-# Enable ssl
-RUN a2enmod ssl
+# Copy your custom Apache configuration
+COPY /bin/apache.conf /etc/apache2/conf-enabled/default.conf
 
 # Expose HTTP and HTTPS ports
 EXPOSE 80 443
 
 # Start Apache in the foreground
-CMD ["httpd-foreground"]
+CMD ["apache2-foreground"]

@@ -2,10 +2,12 @@ services:
   main:
     build: 
       context: .
-      dockerfile: ./bin/Dockerfile.python
+      dockerfile: ./bin/Dockerfile.apache
     container_name: "${COMPOSE_PROJECT_NAME}-main"
+    restart: "always"
     volumes:
-      - ./src:/app:rw
+      - ./src/static:/var/www/html:rw
+      - ./logs/apache2:/var/log/apache2
     networks:
       - connector
     ports:
@@ -15,9 +17,25 @@ services:
     build: 
       context: .
       dockerfile: ./bin/Dockerfile.python
+    restart: "always"
     container_name: "${COMPOSE_PROJECT_NAME}-python"
     volumes:
-      - ./src:/app:rw
+      - ./src/API:/app:rw
+    networks:
+      - connector
+  mysql:
+    build:
+      context: .
+      dockerfile: "./bin/Dockerfile.mysql"
+    container_name: "${COMPOSE_PROJECT_NAME}-mysql"
+    restart: "always"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+      - ./logs/mysql:/var/log/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: America/Los_Angeles
+    command: --mysql-native-password=ON
     networks:
       - connector
 
