@@ -1,0 +1,1 @@
+Scratch Projects Assets (this includes all default assets from the Scratch project) - Creative Commons Attribution-ShareAlike 2.0 license' (https://scratch.mit.edu/terms_of_use/ section 5.2)
