@@ -2,7 +2,9 @@ from flask import request, jsonify, make_response
 import os
 import json
 
-def projects_route():
+def projects_route(subpath=""):
+    if subpath == '':
+        return jsonify({"status": "error", "error": "project path not provided"}), 400
     # Set CORS headers
     response = make_response()
     response.headers["Access-Control-Allow-Origin"] = os.getenv('HOSTED_ON')
@@ -22,9 +24,9 @@ def projects_route():
     elif request.method == 'GET':
         # Logic to check if project is public or accessible (to be implemented)
         # Read JSON file from the server
-        payload = request.args.get('payload', '')
+
         try:
-            with open(f'ProjectData/ProjectData/{payload}.json', 'r') as file:
+            with open(f'app/internalAPI/projectData/projectData/1.json', 'r') as file:
                 data = json.load(file)
         except FileNotFoundError:
             return jsonify({"status": "error", "error": "torch does not exist"}), 404

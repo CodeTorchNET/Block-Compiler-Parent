@@ -34,7 +34,7 @@ def projectsMETA_route():
             return jsonify({"status": "error", "error": "No payload given"}), 500
 
         # Save data to the specified JSON file
-        filepath = f'ProjectData/ProjectData/{payload}.json'
+        filepath = f'app/internalAPI/projectData/projectData/{payload}.json'
         try:
             with open(filepath, 'wb') as file:
                 file.write(data)

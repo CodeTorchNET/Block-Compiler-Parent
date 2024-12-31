@@ -21,6 +21,7 @@ services:
     container_name: "${COMPOSE_PROJECT_NAME}-python"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      DEBUG: ${DEBUG}
     volumes:
       - ./src/API:/app:rw
     networks:
