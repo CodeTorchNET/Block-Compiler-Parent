@@ -4,7 +4,7 @@ FROM python:3.9
 
 RUN pip install --upgrade pip
 
-RUN pip install flask
+RUN pip install flask mysql-connector-python
 
 # start main.py
 CMD ["python", "app/entry.py"]

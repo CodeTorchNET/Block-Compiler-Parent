@@ -19,6 +19,8 @@ services:
       dockerfile: ./bin/Dockerfile.python
     restart: "always"
     container_name: "${COMPOSE_PROJECT_NAME}-python"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     volumes:
       - ./src/API:/app:rw
     networks:
