@@ -59,12 +59,11 @@ services:
 
   bc_yjs_server:
     build:
-      context: .
-      dockerfile: Dockerfile.yjs
+      context: ./Collaborator
+      dockerfile: "../bin/Dockerfile.yjs"
     restart: "always"
     container_name: "${COMPOSE_PROJECT_NAME}-yjs-server"
     volumes:
-      - ./Collaborator:/usr/src/app/Collaborator:rw
       - yjs_leveldb_data:/usr/src/app/db
     environment:
       PORT: "4444"
