@@ -334,7 +334,7 @@ const server = http.createServer((request, response) => {
       response.end('Not Found');
     }
   } else {
-    if (req.url === '/') {
+    if (request.url === '/') {
       response.writeHead(200, { 'Content-Type': 'text/plain' });
       response.end('CodeTorch Collaborator server is running.');
     } else {
