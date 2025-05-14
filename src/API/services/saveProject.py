@@ -1,5 +1,5 @@
 import os
-import json
+import json 
 from flask import jsonify
 
 from API.services.helpers import get_db_connection, verifyToken, limiter
@@ -39,29 +39,55 @@ def saveProject(request, project_id):
         db_connection = get_db_connection()
         cursor = db_connection.cursor(dictionary=True)
 
-        # Step 2: Query the database for the project
-        query = "SELECT Owner FROM projects WHERE projectID = %s"
+        # Step 2: Query the database for the project owner and collaborators
+        query = "SELECT Owner, Collaborators FROM projects WHERE projectID = %s"
         cursor.execute(query, (project_id,))
-        project = cursor.fetchone()
-        if not project:
+        project_db_info = cursor.fetchone()
+
+        if not project_db_info:
             return jsonify({
                 "status": "error",
                 "message": "Invalid project ID"
             }), 404
         
-        # Step 3: Verify the token
-        if not verifyToken(token, project['Owner']):
+        # Step 3: Verify the token against owner or collaborators
+        can_save = False
+        # Check if token belongs to the owner
+        if verifyToken(token, project_db_info['Owner']):
+            can_save = True
+        else:
+            # If not owner, check if token belongs to any collaborator
+            collaborators_json = project_db_info['Collaborators']
+            if collaborators_json:
+                collaborators_list = []
+                if isinstance(collaborators_json, str):
+                    try:
+                        collaborators_list = json.loads(collaborators_json)
+                    except json.JSONDecodeError:
+                        print(f"Warning: Malformed JSON in Collaborators for projectID {project_id}")
+                        pass # Treat as no collaborators if JSON is bad
+                elif isinstance(collaborators_json, list): # If DB driver already parsed it
+                    collaborators_list = collaborators_json
+                
+                if isinstance(collaborators_list, list):
+                    for collaborator_username in collaborators_list:
+                        if verifyToken(token, collaborator_username):
+                            can_save = True
+                            break # Found a valid collaborator token
+        
+        if not can_save:
             return jsonify({
                 "status": "error",
-                "message": "Invalid token"
+                "message": "Invalid token or insufficient permissions to save."
             }), 403
         
-        # Step 4: Update project timestamp
-        query = "UPDATE projects SET EditTS = CURRENT_TIMESTAMP WHERE projectID = %s"
-        cursor.execute(query, (project_id,))
+        # Step 4: Update project timestamp in the database
+        update_query = "UPDATE projects SET EditTS = CURRENT_TIMESTAMP WHERE projectID = %s"
+        cursor.execute(update_query, (project_id,))
         db_connection.commit()
 
-        return internalSaveProject(request, project_id)
+        # Step 5: Call internalSaveProject to write data to file
+        return internalSaveProject(request, project_id) 
     
     except Exception as e:
         return jsonify({

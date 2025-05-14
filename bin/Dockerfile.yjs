@@ -1,0 +1,19 @@
+FROM node:18-alpine AS base
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+
+RUN npm install --omit=dev
+
+COPY ./Collaborator ./Collaborator
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=4444
+ENV PERSISTENCE_DIR=/usr/src/app/db
+
+RUN mkdir -p /usr/src/app/db
+
+# Command to run the application
+CMD [ "node", "./Collaborator/main.js" ]
