@@ -68,6 +68,7 @@ services:
     environment:
       PORT: "4444"
       PERSISTENCE_DIR: "/usr/src/app/db"
+      DEV_MODE: ${COLLABORATOR_DEV_MODE}
     ports:
       - "${COLLABORATOR_PORT}:4444"
     networks:

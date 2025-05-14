@@ -16,6 +16,7 @@ const PORT = parseInt(process.env.PORT || '4444', 10);
 const PERSISTENCE_DIR = process.env.PERSISTENCE_DIR || './db';
 const CLEANUP_INTERVAL_MS = parseInt(process.env.CLEANUP_INTERVAL_MS || (60 * 1000).toString(), 10);
 const INACTIVITY_TIMEOUT_MS = parseInt(process.env.INACTIVITY_TIMEOUT_MS || (5 * 60 * 1000).toString(), 10);
+const DEV_MODE = process.env.DEV_MODE === 'true' || process.env.DEV_MODE === 'True';
 
 // --- Globals ---
 const docs = new Map();
@@ -311,25 +312,35 @@ const setupWSConnection = (conn, req) => {
 
 // --- HTTP Server (for health checks, stats) ---
 const server = http.createServer((request, response) => {
-  if (request.url === '/health') {
-    response.writeHead(200, { 'Content-Type': 'application/json' });
-    let clientCount = 0;
-    docs.forEach(doc => clientCount += doc.conns.size);
-    response.end(JSON.stringify({ status: 'ok', rooms: docs.size, clients: clientCount }));
-  } else if (request.url === '/stats' || request.url === '/') {
-    response.writeHead(200, { 'Content-Type': 'text/html' });
-    let html = '<h1>Y-Websocket Server Status</h1>';
-    html += `<p>Listening on: ws://${HOST}:${PORT}</p>`;
-    html += `<p>Persistence: ${PERSISTENCE_DIR ? `LevelDB at ${PERSISTENCE_DIR}` : 'Disabled'}</p>`;
-    html += `<h2>Active Rooms (${docs.size}):</h2><ul>`;
-    docs.forEach((doc, roomName) => {
-      html += `<li>${roomName} (Connections: ${doc.conns.size}, Awareness: ${doc.awareness.getStates().size})</li>`;
-    });
-    html += '</ul>';
-    response.end(html);
+  if (DEV_MODE) {
+    if (request.url === '/health') {
+      response.writeHead(200, { 'Content-Type': 'application/json' });
+      let clientCount = 0;
+      docs.forEach(doc => clientCount += doc.conns.size);
+      response.end(JSON.stringify({ status: 'ok', rooms: docs.size, clients: clientCount }));
+    } else if (request.url === '/stats' || request.url === '/') {
+      response.writeHead(200, { 'Content-Type': 'text/html' });
+      let html = '<h1>Y-Websocket Server Status</h1>';
+      html += `<p>Listening on: ws://${HOST}:${PORT}</p>`;
+      html += `<p>Persistence: ${PERSISTENCE_DIR ? `LevelDB at ${PERSISTENCE_DIR}` : 'Disabled'}</p>`;
+      html += `<h2>Active Rooms (${docs.size}):</h2><ul>`;
+      docs.forEach((doc, roomName) => {
+        html += `<li>${roomName} (Connections: ${doc.conns.size}, Awareness: ${doc.awareness.getStates().size})</li>`;
+      });
+      html += '</ul>';
+      response.end(html);
+    } else {
+      response.writeHead(404, { 'Content-Type': 'text/plain' });
+      response.end('Not Found');
+    }
   } else {
-    response.writeHead(404, { 'Content-Type': 'text/plain' });
-    response.end('Not Found');
+    if (req.url === '/') {
+      response.writeHead(200, { 'Content-Type': 'text/plain' });
+      response.end('CodeTorch Collaborator server is running.');
+    } else {
+      response.writeHead(404, { 'Content-Type': 'text/plain' });
+      response.end('Not Found');
+    }
   }
 });
 
