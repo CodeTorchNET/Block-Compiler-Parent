@@ -30,7 +30,7 @@ def LP_routes():
             OR (Collaborators IS NOT NULL AND JSON_CONTAINS(Collaborators, JSON_QUOTE(%s), '$'))
         ORDER BY EditTS DESC
     """
-    cursor.execute(query, (username,))
+    cursor.execute(query, (username, username))
     projects = cursor.fetchall()
     project_data = [{
         "projectID": project['projectID'],
