@@ -2,26 +2,40 @@ import os
 import json 
 from flask import jsonify
 
-from API.services.helpers import get_db_connection, verifyToken, limiter
+from API.services.helpers import get_db_connection, verifyToken, limiter, redis_connection
+
+import redis.exceptions
 
 
 def internalSaveProject(request, project_id):
     # check if project exists
     project_data = request.json
-    if(project_data is None):
+    if project_data is None:
         return jsonify({"status": "error", "error": "no project data provided"}), 400
-    project_file_path = f'storage/projectData/projectData/{project_id}.json'
-
-    if not os.path.exists(project_file_path):
-        return jsonify({"status": "error", "error": "project does not exist"}), 404
-    try:
-        # Save updated project data
-        with open(project_file_path, 'w') as file:
-            json.dump(project_data, file, indent=4)  # indent=4 for pretty printing
-    except (IOError, json.JSONDecodeError) as e:
-        return jsonify({"status": "error", "error": str(e)}), 500
     
-    return jsonify({"status": "ok", "autosave-interval": "120"})
+    project_file_path = f'storage/projectData/projectData/{project_id}.json'
+    lock_key = f"project_save_lock:{project_id}"
+
+    try:
+        with redis_connection.lock(lock_key, timeout=10, blocking_timeout=5) as lock:
+            if lock.locked():
+                if not os.path.exists(project_file_path):
+                    return jsonify({"status": "error", "error": "project does not exist"}), 404
+                try:
+                    # Save updated project data
+                    with open(project_file_path, 'w') as file:
+                        json.dump(project_data, file, indent=4) # indent=4 for pretty printing
+                    return jsonify({"status": "ok", "autosave-interval": "120"})
+                except (IOError, json.JSONDecodeError) as e:
+                    return jsonify({"status": "error", "error": str(e)}), 500
+            else:
+                return jsonify({"status": "error", "error": "Could not acquire file lock, please try again."}), 503
+
+    except redis.exceptions.LockError:
+        return jsonify({"status": "error", "error": "Another process is currently saving this project. Please try again shortly."}), 503
+    except Exception as e:
+        print(f"An unexpected error occurred during save project lock or file write: {e}")
+        return jsonify({"status": "error", "message": "An internal server error occurred during save."}), 500
 
 
 @limiter.limit("10 per minute")
