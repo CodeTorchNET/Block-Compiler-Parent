@@ -42,7 +42,7 @@ def getUsernameFromToken(token):
         cursor.close()
         db_connection.close()
 
-@limiter.limit("2 per minute")
+@limiter.limit("5 per minute")
 def remixProject(request):
     """Handles the creation of a new project and stores data."""
     try:

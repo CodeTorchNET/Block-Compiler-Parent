@@ -22,7 +22,7 @@ def get_username_by_token(token):
             db_connection.close()
 
 
-@limiter.limit("10 per minute")
+@limiter.limit("30 per minute")
 def projectsMETA_route():
     if request.method == 'OPTIONS':
         return "", 204

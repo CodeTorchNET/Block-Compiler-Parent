@@ -3,7 +3,7 @@ import json
 
 from API.services.helpers import get_db_connection, verifyToken, limiter
 
-@limiter.limit("5 per minute")
+@limiter.limit("30 per minute")
 def loadProject(project_id, request_obj):
     """
     Loads a project from a JSON file based on the project ID.

@@ -28,7 +28,7 @@ def save_project_data_to_file(project_id, data):
     except FileNotFoundError:
         raise Exception(f"Failed to create project file at {file_path}")
 
-@limiter.limit("2 per minute")
+@limiter.limit("5 per minute")
 def createNewProject(request):
     """Handles the creation of a new project and stores data."""
     try:

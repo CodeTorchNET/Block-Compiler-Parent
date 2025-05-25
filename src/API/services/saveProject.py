@@ -38,7 +38,7 @@ def internalSaveProject(request, project_id):
         return jsonify({"status": "error", "message": "An internal server error occurred during save."}), 500
 
 
-@limiter.limit("10 per minute")
+@limiter.limit("15 per minute")
 def saveProject(request, project_id):
     # (FUTURE) prevent user from uploading random JSON (validate JSON format)
 
