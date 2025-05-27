@@ -4,6 +4,7 @@ from .updateProjectTitle import UPT_routes
 from .deleteProject import deleteProject_routes
 from .loadProjects import LP_routes
 from .updateCollaborators import update_collaborators_route
+from .collaborationAuth import collaborationAuth_routes
 
 def internal_register_routes(app):
     app.add_url_rule("/internal/updateUserAuthToken", methods=['POST', 'OPTIONS'], view_func=UUAT_routes)
@@ -12,3 +13,4 @@ def internal_register_routes(app):
     app.add_url_rule("/internal/deleteProject", methods=['POST', 'OPTIONS'], view_func=deleteProject_routes)
     app.add_url_rule("/internal/loadProjects", methods=['POST', 'OPTIONS'], view_func=LP_routes)
     app.add_url_rule("/internal/updateCollaborators", methods=['POST', 'OPTIONS'], view_func=update_collaborators_route)
+    app.add_url_rule("/internal/collaborationAuth", methods=['POST', 'OPTIONS'], view_func=collaborationAuth_routes)
