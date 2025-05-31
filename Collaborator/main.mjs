@@ -16,6 +16,7 @@ const PORT = parseInt(process.env.PORT || '4444', 10);
 const PERSISTENCE_DIR = process.env.PERSISTENCE_DIR || './db';
 const CLEANUP_INTERVAL_MS = parseInt(process.env.CLEANUP_INTERVAL_MS || (60 * 1000).toString(), 10);
 const INACTIVITY_TIMEOUT_MS = parseInt(process.env.INACTIVITY_TIMEOUT_MS || (5 * 60 * 1000).toString(), 10);
+const AUTH_API_TIMEOUT_MS = parseInt(process.env.AUTH_API_TIMEOUT_MS || '5000', 10);
 const DEV_MODE = process.env.DEV_MODE === 'true' || process.env.DEV_MODE === 'True';
 
 // New: Python Backend API Configuration for authentication
@@ -242,6 +243,8 @@ async function verifyUserToken(username, token, roomid) {
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), AUTH_API_TIMEOUT_MS);
         const response = await fetch(`${PYTHON_INTERNAL_API_URL}/internal/collaborationAuth`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -250,8 +253,10 @@ async function verifyUserToken(username, token, roomid) {
                 user_id: username,
                 user_token: token,
                 roomID: roomid
-            })
+            }),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -268,6 +273,11 @@ async function verifyUserToken(username, token, roomid) {
         }
     } catch (e) {
         console.error(`[AUTH] Error calling Python authentication API:`, e);
+        if (e.name === 'AbortError') {
+            console.error(`[AUTH] Python authentication API call timed out after ${AUTH_API_TIMEOUT_MS}ms.`);
+        } else {
+            console.error(`[AUTH] Error calling Python authentication API:`, e);
+        }
         return false;
     }
 }
