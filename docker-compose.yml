@@ -8,6 +8,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       DEBUG: ${DEBUG}
+      InternalAPIKey: ${InternalAPIKey}
     volumes:
       - ./src:/app:rw
       - .env:/app/.env:ro
@@ -57,6 +58,31 @@ services:
     ports:
       - "${PHPMYADMIN_PORT}:80"
 
+  bc_yjs_server:
+    build:
+      context: ./Collaborator
+      dockerfile: "../bin/Dockerfile.yjs"
+      args:
+        PYTHON_INTERNAL_API_URL: ${PYTHON_INTERNAL_API_URL}
+        PYTHON_INTERNAL_API_KEY: ${PYTHON_INTERNAL_API_KEY}
+    restart: "always"
+    container_name: "${COMPOSE_PROJECT_NAME}-yjs-server"
+    volumes:
+      - yjs_leveldb_data:/usr/src/app/db
+    environment:
+      PORT: "4444"
+      PERSISTENCE_DIR: "/usr/src/app/db"
+      DEV_MODE: ${COLLABORATOR_DEV_MODE}
+      PYTHON_INTERNAL_API_URL: ${PYTHON_INTERNAL_API_URL}
+      PYTHON_INTERNAL_API_KEY: ${PYTHON_INTERNAL_API_KEY}
+    ports:
+      - "${COLLABORATOR_PORT}:4444"
+    networks:
+      - connector
+
 networks:
   connector:
     driver: bridge
+
+volumes:
+  yjs_leveldb_data: {}
