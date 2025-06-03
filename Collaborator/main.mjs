@@ -41,10 +41,10 @@ class MyWSSharedDoc extends Y.Doc {
     super({ gc: true });
     this.name = name;
     this.mux = mutex.createMutex();
-    
+
     /** @type {Map<WebSocket, Set<number>>} */
-    this.conns = new Map(); 
-    
+    this.conns = new Map();
+
     this.awareness = new awarenessProtocol.Awareness(this);
     /**
      * Handles Yjs document updates and broadcasts them.
@@ -58,7 +58,7 @@ class MyWSSharedDoc extends Y.Doc {
       encoding.writeVarUint(encoder, MESSAGE_SYNC);
       syncProtocol.writeUpdate(encoder, update);
       const message = encoding.toUint8Array(encoder);
-      
+
       this.conns.forEach((_, conn) => {
         // Ensure only authenticated connections receive updates if conn.authenticated is still desired
         if (conn !== origin && conn.authenticated) {
@@ -98,13 +98,13 @@ class MyWSSharedDoc extends Y.Doc {
     console.log(`[DEBUG] Destroying MyWSSharedDoc for room: ${this.name}`);
     super.destroy();
     this.awareness.destroy();
-    
+
     this.conns.forEach((_, conn) => {
-        try {
-            if (conn.readyState === OPEN || conn.readyState === CONNECTING) {
-              conn.terminate();
-            }
-        } catch (e) { /* ignore */ }
+      try {
+        if (conn.readyState === OPEN || conn.readyState === CONNECTING) {
+          conn.terminate();
+        }
+      } catch (e) { /* ignore */ }
     });
     this.conns.clear();
   }
@@ -120,7 +120,7 @@ if (PERSISTENCE_DIR) {
       const newUpdates = Y.encodeStateAsUpdate(ydoc);
 
       Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(persistedYDoc), 'persistence_load');
-      
+
       if (newUpdates.length > 2) {
         await ldbInstance.storeUpdate(docName, newUpdates);
       }
@@ -135,16 +135,16 @@ if (PERSISTENCE_DIR) {
       await ldbInstance.flushDocument(docName);
     },
     clearDocument: async (docName) => {
-        try {
-            await ldbInstance.del(docName);
-            console.log(`[INFO] Cleared persisted state for room: ${docName}`);
-        } catch (err) {
-            if (err.notFound) {
-                console.log(`[DEBUG] No persisted state found for room: ${docName} to clear.`);
-            } else {
-                console.error(`[ERROR] Failed to clear persisted state for room ${docName}:`, err);
-            }
+      try {
+        await ldbInstance.clearDocument(docName);
+        console.log(`[INFO] Cleared persisted state for room: ${docName}`);
+      } catch (err) {
+        if (err.notFound) {
+          console.log(`[DEBUG] No persisted state found for room: ${docName} to clear.`);
+        } else {
+          console.error(`[ERROR] Failed to clear persisted state for room ${docName}:`, err);
         }
+      }
     },
     provider: ldbInstance // Also ensure the provider itself is stored
   };
@@ -186,7 +186,7 @@ const messageListener = (conn, doc, message) => {
         }
         break;
       case MESSAGE_AWARENESS:
-        awarenessProtocol.applyAwarenessUpdate(doc.awareness, decoding.readVarUint8Array(decoder), conn); 
+        awarenessProtocol.applyAwarenessUpdate(doc.awareness, decoding.readVarUint8Array(decoder), conn);
         break;
       default:
         console.error(`[ERROR] Unknown message type received from client in room ${doc.name}: ${messageType}`);
@@ -250,49 +250,49 @@ const closeConn = (doc, conn, code = 1000, reason = 'Normal Closure') => {
  * @returns {Promise<boolean>} True if valid, false otherwise.
  */
 async function verifyUserToken(username, token, roomid) {
-    if (!PYTHON_INTERNAL_API_URL || !PYTHON_INTERNAL_API_KEY) {
-        console.error('[AUTH] PYTHON_INTERNAL_API_URL or PYTHON_INTERNAL_API_KEY not configured.');
-        return false;
+  if (!PYTHON_INTERNAL_API_URL || !PYTHON_INTERNAL_API_KEY) {
+    console.error('[AUTH] PYTHON_INTERNAL_API_URL or PYTHON_INTERNAL_API_KEY not configured.');
+    return false;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AUTH_API_TIMEOUT_MS);
+    const response = await fetch(`${PYTHON_INTERNAL_API_URL}/internal/collaborationAuth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: PYTHON_INTERNAL_API_KEY,
+        user_id: username,
+        user_token: token,
+        roomID: roomid
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[AUTH] Python API error response (${response.status}): ${errorText}`);
+      return false;
     }
 
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), AUTH_API_TIMEOUT_MS);
-        const response = await fetch(`${PYTHON_INTERNAL_API_URL}/internal/collaborationAuth`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                token: PYTHON_INTERNAL_API_KEY,
-                user_id: username,
-                user_token: token,
-                roomID: roomid
-            }),
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[AUTH] Python API error response (${response.status}): ${errorText}`);
-            return false;
-        }
-
-        const data = await response.json();
-        if (data.status === 'success' && data.username === username) {
-            return true;
-        } else {
-            console.warn(`[AUTH] Token verification failed for user '${username}'. Reason: ${data.message || 'Unknown'}`);
-            return false;
-        }
-    } catch (e) {
-        console.error(`[AUTH] Error calling Python authentication API:`, e);
-        if (e.name === 'AbortError') {
-            console.error(`[AUTH] Python authentication API call timed out after ${AUTH_API_TIMEOUT_MS}ms.`);
-        } else {
-            console.error(`[AUTH] Error calling Python authentication API:`, e);
-        }
-        return false;
+    const data = await response.json();
+    if (data.status === 'success' && data.username === username) {
+      return true;
+    } else {
+      console.warn(`[AUTH] Token verification failed for user '${username}'. Reason: ${data.message || 'Unknown'}`);
+      return false;
     }
+  } catch (e) {
+    console.error(`[AUTH] Error calling Python authentication API:`, e);
+    if (e.name === 'AbortError') {
+      console.error(`[AUTH] Python authentication API call timed out after ${AUTH_API_TIMEOUT_MS}ms.`);
+    } else {
+      console.error(`[AUTH] Error calling Python authentication API:`, e);
+    }
+    return false;
+  }
 }
 
 
@@ -300,7 +300,7 @@ async function verifyUserToken(username, token, roomid) {
 const setupWSConnection = (conn, req, roomName, clientUsername) => {
   conn.binaryType = 'arraybuffer';
   conn.authenticated = true; // Auth already performed in upgrade handler
-  conn.username = clientUsername; 
+  conn.username = clientUsername;
   console.log(`[AUTH] User '${conn.username}' authenticated successfully for room: ${roomName}`);
 
   const doc = getYDoc(roomName);
@@ -314,12 +314,12 @@ const setupWSConnection = (conn, req, roomName, clientUsername) => {
   let pongReceived = true;
   const pingInterval = setInterval(() => {
     if (!doc.conns.has(conn)) {
-        clearInterval(pingInterval);
-        return;
+      clearInterval(pingInterval);
+      return;
     }
     if (!pongReceived) {
       console.log(`[INFO] Ping timeout for client '${conn.username}' in room ${roomName}. Closing connection.`);
-      closeConn(doc, conn); 
+      closeConn(doc, conn);
       return;
     }
     if (conn.readyState === OPEN) {
@@ -365,7 +365,7 @@ const setupWSConnection = (conn, req, roomName, clientUsername) => {
     encoding.writeVarUint8Array(awarenessEncoder, awarenessUpdateBytes);
     send(doc, conn, encoding.toUint8Array(awarenessEncoder));
   }
-  
+
   roomLastActive.set(roomName, Date.now());
   console.log(`[INFO] Client '${conn.username}' connected to room: ${roomName}. Total conns for room: ${doc.conns.size}`);
 };
@@ -412,55 +412,55 @@ const roomLastActive = new Map(); // roomName -> timestamp for cleanup
 
 // This listener is now only for already authenticated and upgraded connections
 wss.on('connection', (ws, req, roomName, clientUsername) => {
-    // Call the setup function with the pre-authenticated details
-    setupWSConnection(ws, req, roomName, clientUsername);
+  // Call the setup function with the pre-authenticated details
+  setupWSConnection(ws, req, roomName, clientUsername);
 });
 
 // --- Pre-handshake authentication on HTTP server's 'upgrade' event ---
 // This must be attached to the HTTP server *before* it starts listening, 
 // and before the WebSocketServer is given control of the 'upgrade' event (hence noServer: true)
 server.on('upgrade', async (request, socket, head) => {
-    const url = new URL(request.url, `http://${request.headers.host}`);
-    const roomName = url.pathname.slice(1).split('?')[0].replace(/^\/*/, '');
+  const url = new URL(request.url, `http://${request.headers.host}`);
+  const roomName = url.pathname.slice(1).split('?')[0].replace(/^\/*/, '');
 
-    if (!roomName) {
-        console.warn('[AUTH] Connection attempt without room name (upgrade). Denying.');
-        socket.write('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n'); // Proper HTTP error
-        socket.destroy();
-        return;
-    }
+  if (!roomName) {
+    console.warn('[AUTH] Connection attempt without room name (upgrade). Denying.');
+    socket.write('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n'); // Proper HTTP error
+    socket.destroy();
+    return;
+  }
 
-    const clientUsername = url.searchParams.get('username');
-    const clientToken = url.searchParams.get('token');
+  const clientUsername = url.searchParams.get('username');
+  const clientToken = url.searchParams.get('token');
 
-    if (!clientUsername || !clientToken) {
-        console.warn(`[AUTH] Connection attempt to room ${roomName} missing username or token (upgrade). Denying.`);
-        socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
-        socket.destroy();
-        return;
-    }
+  if (!clientUsername || !clientToken) {
+    console.warn(`[AUTH] Connection attempt to room ${roomName} missing username or token (upgrade). Denying.`);
+    socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
 
-    const isAuthenticated = await verifyUserToken(clientUsername, clientToken, roomName);
+  const isAuthenticated = await verifyUserToken(clientUsername, clientToken, roomName);
 
-    if (!isAuthenticated) {
-        console.warn(`[AUTH] Authentication failed for user '${clientUsername}' in room ${roomName} (upgrade). Denying.`);
-        socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
-        socket.destroy();
-        return;
-    }
+  if (!isAuthenticated) {
+    console.warn(`[AUTH] Authentication failed for user '${clientUsername}' in room ${roomName} (upgrade). Denying.`);
+    socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
 
-    // If authentication succeeds, then delegate to the WebSocket server
-    wss.handleUpgrade(request, socket, head, (ws) => {
-        // Emit the 'connection' event with the ws instance and authenticated info
-        wss.emit('connection', ws, request, roomName, clientUsername);
-    });
+  // If authentication succeeds, then delegate to the WebSocket server
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    // Emit the 'connection' event with the ws instance and authenticated info
+    wss.emit('connection', ws, request, roomName, clientUsername);
+  });
 });
 
 // --- Room Cleanup Logic ---
 function cleanupRooms() {
   const now = Date.now();
   if (docs.size === 0 && roomLastActive.size === 0) return;
-  
+
   console.log(`[INFO] Running cleanup check. Rooms in memory: ${docs.size}, Rooms tracked for activity: ${roomLastActive.size}`);
 
   docs.forEach((doc, roomName) => {
@@ -470,14 +470,14 @@ function cleanupRooms() {
       const lastActive = roomLastActive.get(roomName);
       if (lastActive && (now - lastActive > INACTIVITY_TIMEOUT_MS)) {
         console.log(`[INFO] Cleaning up inactive room (memory): ${roomName}. Last active: ${new Date(lastActive).toISOString()}`);
-        
+
         let cleanupPromise;
         if (persistenceProvider && typeof persistenceProvider.clearDocument === 'function') {
-            cleanupPromise = persistenceProvider.clearDocument(roomName)
-                .then(() => console.log(`[INFO] Cleared persisted state for ${roomName} before unloading.`));
+          cleanupPromise = persistenceProvider.clearDocument(roomName)
+            .then(() => console.log(`[INFO] Cleared persisted state for ${roomName} before unloading.`));
         } else {
-            // Fallback if persistenceProvider or clearDocument is not configured/available
-            cleanupPromise = Promise.resolve();
+          // Fallback if persistenceProvider or clearDocument is not configured/available
+          cleanupPromise = Promise.resolve();
         }
 
         cleanupPromise
@@ -541,21 +541,21 @@ const shutdown = async (signal) => {
       resolve();
     });
     setTimeout(() => {
-        console.warn('[WARN] WebSocket server close timed out. Forcing HTTP server close.');
-        resolve();
+      console.warn('[WARN] WebSocket server close timed out. Forcing HTTP server close.');
+      resolve();
     }, 3000);
   });
 
   console.log('[INFO] Closing HTTP server...');
-   await new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     server.close((err) => {
-        if (err) console.error('[ERROR] Error closing HTTP server:', err);
-        console.log('[INFO] HTTP server closed.');
-        resolve();
+      if (err) console.error('[ERROR] Error closing HTTP server:', err);
+      console.log('[INFO] HTTP server closed.');
+      resolve();
     });
     setTimeout(() => {
-        console.warn('[WARN] HTTP server close timed out.');
-        resolve();
+      console.warn('[WARN] HTTP server close timed out.');
+      resolve();
     }, 3000);
   });
 
@@ -567,22 +567,22 @@ const shutdown = async (signal) => {
         console.log(`[DEBUG] Queuing flush for room: ${roomName}`);
         flushPromises.push(
           persistenceProvider.writeState(roomName, doc)
-              .catch(err => console.error(`[ERROR] Failed to write state for ${roomName} on shutdown:`, err))
+            .catch(err => console.error(`[ERROR] Failed to write state for ${roomName} on shutdown:`, err))
         );
       }
     });
     if (flushPromises.length > 0) {
-        try {
-            await Promise.all(flushPromises);
-            console.log('[INFO] All relevant documents in memory finalized.');
-        } catch (error) {
-            console.error('[ERROR] Error finalizing documents during shutdown:', error);
-        }
+      try {
+        await Promise.all(flushPromises);
+        console.log('[INFO] All relevant documents in memory finalized.');
+      } catch (error) {
+        console.error('[ERROR] Error finalizing documents during shutdown:', error);
+      }
     } else {
-        console.log('[INFO] No active documents needed flushing.');
+      console.log('[INFO] No active documents needed flushing.');
     }
   }
-  
+
   console.log('[INFO] Shutdown complete.');
   process.exit(0);
 };
