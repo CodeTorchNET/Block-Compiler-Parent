@@ -26,7 +26,6 @@ const PYTHON_INTERNAL_API_KEY = process.env.PYTHON_INTERNAL_API_KEY; // From exa
 // --- Globals ---
 const docs = new Map();
 let persistenceProvider = null;
-let ldbInstance = null;
 
 // Message types
 const MESSAGE_SYNC = 0;
@@ -113,40 +112,28 @@ class MyWSSharedDoc extends Y.Doc {
 // --- Persistence Setup ---
 if (PERSISTENCE_DIR) {
   console.log(`[INFO] Initializing LevelDB persistence in ${PERSISTENCE_DIR}`);
-  ldbInstance = new LeveldbPersistence(PERSISTENCE_DIR);
+  const ldb = new LeveldbPersistence(PERSISTENCE_DIR);
   persistenceProvider = {
     bindState: async (docName, ydoc) => {
-      const persistedYDoc = await ldbInstance.getYDoc(docName);
+      const persistedYDoc = await ldb.getYDoc(docName);
       const newUpdates = Y.encodeStateAsUpdate(ydoc);
 
       Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(persistedYDoc), 'persistence_load');
       
       if (newUpdates.length > 2) {
-        await ldbInstance.storeUpdate(docName, newUpdates);
+        await ldb.storeUpdate(docName, newUpdates);
       }
 
       ydoc.on('update', (update, origin) => {
         if (origin !== 'persistence_load') {
-          ldbInstance.storeUpdate(docName, update).catch(err => console.error(`[ERROR] Failed to store update for ${docName}:`, err)); // Use ldbInstance
+          ldb.storeUpdate(docName, update).catch(err => console.error(`[ERROR] Failed to store update for ${docName}:`, err));
         }
       });
     },
     writeState: async (docName, ydoc) => {
-      await ldbInstance.flushDocument(docName);
+      await ldb.flushDocument(docName);
     },
-    clearDocument: async (docName) => {
-        try {
-            await ldbInstance.del(docName);
-            console.log(`[INFO] Cleared persisted state for room: ${docName}`);
-        } catch (err) {
-            if (err.notFound) {
-                console.log(`[DEBUG] No persisted state found for room: ${docName} to clear.`);
-            } else {
-                console.error(`[ERROR] Failed to clear persisted state for room ${docName}:`, err);
-            }
-        }
-    },
-    provider: ldbInstance // Also ensure the provider itself is stored
+    provider: ldb
   };
 }
 
@@ -471,18 +458,14 @@ function cleanupRooms() {
       if (lastActive && (now - lastActive > INACTIVITY_TIMEOUT_MS)) {
         console.log(`[INFO] Cleaning up inactive room (memory): ${roomName}. Last active: ${new Date(lastActive).toISOString()}`);
         
-        let cleanupPromise;
-        if (persistenceProvider && typeof persistenceProvider.clearDocument === 'function') {
-            cleanupPromise = persistenceProvider.clearDocument(roomName)
-                .then(() => console.log(`[INFO] Cleared persisted state for ${roomName} before unloading.`));
-        } else {
-            // Fallback if persistenceProvider or clearDocument is not configured/available
-            cleanupPromise = Promise.resolve();
-        }
+        const cleanupPromise = persistenceProvider && typeof persistenceProvider.writeState === 'function'
+          ? persistenceProvider.writeState(roomName, doc)
+          : Promise.resolve();
 
         cleanupPromise
           .then(() => {
-            doc.destroy();
+            if (persistenceProvider) console.log(`[INFO] Flushed/finalized document ${roomName} before unloading.`);
+            doc.destroy()
             docs.delete(roomName);
             roomLastActive.delete(roomName);
             console.log(`[INFO] Room ${roomName} unloaded from memory. Rooms remaining: ${docs.size}`);
