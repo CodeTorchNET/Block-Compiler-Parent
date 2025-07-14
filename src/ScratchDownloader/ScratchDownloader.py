@@ -102,7 +102,7 @@ def verify_scratch_comment(username):
                 content_div = comment.find('div', class_='content')
                 if content_div:
                     content = content_div.get_text(strip=True)
-                    if comment_username == username and "CodeTorch Scratch Account Link Verification" in content:
+                    if comment_username.lower() == username.lower() and "CodeTorch Scratch Account Link Verification" in content:
                         time_span = comment.find('span', class_='time')
                         if time_span:
                             timestamp_str = time_span.get('title')
